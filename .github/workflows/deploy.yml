@@ -1,18 +1,17 @@
 name: Deploy to GitHub Pages
 
-'on':
+on:
   push:
     branches:
       - main
       - 'dev*'
   workflow_dispatch:
 
-# Sets concurrency: cancel in-progress runs for the same branch
+# Cancel in-progress runs for the same branch
 concurrency:
   group: pages-${{ github.ref }}
   cancel-in-progress: true
 
-# Default to read-all repo contents; needs write for the gh-pages env
 permissions:
   contents: read
   pages: write
@@ -32,18 +31,21 @@ jobs:
         id: pages
         uses: actions/configure-pages@v4
 
-      - name: Build artifact (copy static site, branch into subfolder)
+      - name: Build artifact
         run: |
+          # Make a clean staging dir, copy contents (not the dir itself) into it
           mkdir -p _site
-          cp -r . _site/
+          # Use a tar pipeline to copy CONTENTS of the repo, not the repo dir itself
+          # Exclude .git and the .github dir
+          tar --exclude='./.git' --exclude='./_site' --exclude='./.github' -cf - . | tar -xf - -C _site
+
           # For non-main branches, nest everything under <branch-name>/
           # so the final URL is /<repo>/<branch>/index.html
           if [[ "${{ github.ref }}" != "refs/heads/main" ]]; then
             BRANCH_NAME=$(echo "${{ github.ref }}" | sed 's|refs/heads/||')
             mkdir -p "_site/$BRANCH_NAME"
             shopt -s dotglob
-            # Move all files (including hidden) into the subfolder
-            # Skip the _site dir itself to avoid recursion
+            # Move all files (including hidden, except _site itself) into the subfolder
             for f in _site/*; do
               if [[ "$(basename "$f")" != "_site" ]]; then
                 mv "$f" "_site/$BRANCH_NAME/"
@@ -51,6 +53,8 @@ jobs:
             done
             shopt -u dotglob
           fi
+          echo "Final _site structure:"
+          find _site -maxdepth 2 -type d
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
