@@ -34,7 +34,7 @@ jobs:
         id: list-devs
         run: |
           # Get all remote branches matching dev* via git ls-remote
-          DEVS=$(git ls-remote --heads origin 'refs/heads/dev*' | awk '{print $2}' | sed 's|refs/heads/||' | sort)
+          DEVS=$(git ls-remote --heads https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git 'refs/heads/dev*' | awk '{print $2}' | sed 's|refs/heads/||' | sort)
           echo "Found dev branches:"
           echo "$DEVS"
           # Save as multiline output
