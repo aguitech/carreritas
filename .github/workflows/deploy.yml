@@ -45,9 +45,11 @@ jobs:
             BRANCH_NAME=$(echo "${{ github.ref }}" | sed 's|refs/heads/||')
             mkdir -p "_site/$BRANCH_NAME"
             shopt -s dotglob
-            # Move all files (including hidden, except _site itself) into the subfolder
+            # Move all files (including hidden) into the subfolder.
+            # Skip the destination dir itself to avoid moving into self.
             for f in _site/*; do
-              if [[ "$(basename "$f")" != "_site" ]]; then
+              base=$(basename "$f")
+              if [[ "$base" != "_site" && "$base" != "$BRANCH_NAME" ]]; then
                 mv "$f" "_site/$BRANCH_NAME/"
               fi
             done
