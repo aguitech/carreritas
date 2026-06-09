@@ -20,42 +20,32 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      # Always check out main as the base
-      - name: Checkout main
+      # Main: check out into /_site/ (the Pages artifact dir) directly.
+      # The repo root becomes _site, so all files end up at the site root.
+      - name: Checkout main into _site
         uses: actions/checkout@v4
         with:
           ref: main
-          path: main
+          path: _site
 
-      # For non-main triggers, also check out the dev branch
-      - name: Checkout trigger branch
+      # For non-main triggers, also check out the dev branch into _site/<branch>/
+      - name: Checkout trigger branch into _site/<branch>
         if: github.ref != 'refs/heads/main'
         uses: actions/checkout@v4
         with:
           ref: ${{ github.ref }}
-          path: dev
+          path: _site/${{ github.ref_name }}
 
       - name: Setup Pages
         id: pages
         uses: actions/configure-pages@v4
 
-      - name: Build artifact
+      - name: List final _site structure
         run: |
-          mkdir -p _site
-          # Copy main contents (using tar to avoid 'copy into self')
-          tar --exclude='./.git' --exclude='./_site' --exclude='./.github' -cf - . | tar -xf - -C _site
-          # Note: this runs in the main checkout dir
-
-          # If we have a dev branch checked out, add it under <branch>/ subfolder
-          if [[ "${{ github.ref }}" != "refs/heads/main" ]]; then
-            BRANCH_NAME=$(echo "${{ github.ref }}" | sed 's|refs/heads/||')
-            mkdir -p "_site/$BRANCH_NAME"
-            # Copy dev branch contents into the subfolder
-            (cd dev && tar --exclude='./.git' --exclude='./.github' -cf - .) | tar -xf - -C "_site/$BRANCH_NAME"
-            echo "=== Deployed $BRANCH_NAME at /$BRANCH_NAME/ ==="
-          else
-            echo "=== Deployed main at / ==="
-          fi
+          echo "=== Final structure ==="
+          find _site -maxdepth 2 -type d
+          echo "=== Root files ==="
+          ls -la _site/ | head -20
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
