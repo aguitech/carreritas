@@ -1,4 +1,4 @@
-name: Deploy to GitHub Pages
+name: Deploy to GitHub Pages (multi-branch)
 
 on:
   push:
@@ -7,7 +7,6 @@ on:
       - 'dev*'
   workflow_dispatch:
 
-# Cancel in-progress runs for the same branch
 concurrency:
   group: pages-${{ github.ref }}
   cancel-in-progress: true
@@ -20,12 +19,21 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    if: |
-      github.ref == 'refs/heads/main' ||
-      startsWith(github.ref, 'refs/heads/dev')
     steps:
-      - name: Checkout
+      # Always check out main as the base
+      - name: Checkout main
         uses: actions/checkout@v4
+        with:
+          ref: main
+          path: main
+
+      # For non-main triggers, also check out the dev branch
+      - name: Checkout trigger branch
+        if: github.ref != 'refs/heads/main'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+          path: dev
 
       - name: Setup Pages
         id: pages
@@ -33,30 +41,21 @@ jobs:
 
       - name: Build artifact
         run: |
-          # Make a clean staging dir, copy contents (not the dir itself) into it
           mkdir -p _site
-          # Use a tar pipeline to copy CONTENTS of the repo, not the repo dir itself
-          # Exclude .git and the .github dir
+          # Copy main contents (using tar to avoid 'copy into self')
           tar --exclude='./.git' --exclude='./_site' --exclude='./.github' -cf - . | tar -xf - -C _site
+          # Note: this runs in the main checkout dir
 
-          # For non-main branches, nest everything under <branch-name>/
-          # so the final URL is /<repo>/<branch>/index.html
+          # If we have a dev branch checked out, add it under <branch>/ subfolder
           if [[ "${{ github.ref }}" != "refs/heads/main" ]]; then
             BRANCH_NAME=$(echo "${{ github.ref }}" | sed 's|refs/heads/||')
             mkdir -p "_site/$BRANCH_NAME"
-            shopt -s dotglob
-            # Move all files (including hidden) into the subfolder.
-            # Skip the destination dir itself to avoid moving into self.
-            for f in _site/*; do
-              base=$(basename "$f")
-              if [[ "$base" != "_site" && "$base" != "$BRANCH_NAME" ]]; then
-                mv "$f" "_site/$BRANCH_NAME/"
-              fi
-            done
-            shopt -u dotglob
+            # Copy dev branch contents into the subfolder
+            (cd dev && tar --exclude='./.git' --exclude='./.github' -cf - .) | tar -xf - -C "_site/$BRANCH_NAME"
+            echo "=== Deployed $BRANCH_NAME at /$BRANCH_NAME/ ==="
+          else
+            echo "=== Deployed main at / ==="
           fi
-          echo "Final _site structure:"
-          find _site -maxdepth 2 -type d
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
