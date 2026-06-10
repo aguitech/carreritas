@@ -4,7 +4,6 @@ name: Deploy to GitHub Pages (main + all dev* branches)
   push:
     branches:
       - main
-      - 'dev*'
   workflow_dispatch:
 
 # No concurrency: every push gets its own deploy
